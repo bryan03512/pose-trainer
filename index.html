@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pose Trainer</title>
+<meta name="description" content="Train any pose with your webcam — martial arts, yoga, dance, therapy, sport — and get live detection and joint-by-joint coaching. Runs entirely in your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%237c3aed'/%3E%3Cg stroke='%23fff' stroke-width='2.4' stroke-linecap='round' fill='none'%3E%3Cpath d='M16 10v8M9 13l7-1 7 1M16 18l-5 8M16 18l5 8'/%3E%3C/g%3E%3Ccircle cx='16' cy='7' r='2.6' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ============ MENU ============ -->
+<section id="menu" class="menu">
+  <div class="menu-card">
+    <h1>Pose Trainer</h1>
+    <p class="sub">Train any pose with your webcam and get live detection and coaching.</p>
+    <ul>
+      <li>Train any pose: martial arts, yoga, dance, therapy, sport</li>
+      <li>Live pose recognition with confidence score</li>
+      <li>Coaching mode: joint-by-joint corrections against your reference</li>
+      <li>Record your session with the skeleton overlay</li>
+    </ul>
+    <button class="b bt big" id="startBtn">Start camera</button>
+    <p class="fine">Everything runs in your browser. Video never leaves your device.
+      Your trained poses are saved in this browser. Use <b>Poses → Export</b> to back them up.</p>
+    <p id="menuErr" class="err"></p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="app hidden">
+  <div class="bar">
+    <button class="b br" id="recBtn">Record</button>
+    <button class="b bs" id="stopBtn">Stop</button>
+    <button class="b bd" id="dlBtn" disabled>Download</button>
+    <div class="d"></div>
+    <button class="b bt" id="trainBtn">Train Pose</button>
+    <button class="b bk" id="libBtn">Poses</button>
+    <button class="b bc" id="coachBtn">Coaching Mode</button>
+    <div class="d"></div>
+    <select id="camSel" class="sel" title="Camera"></select>
+    <label class="chk" title="Mirror the camera image (on by default)"><input type="checkbox" id="mirrorChk" checked> Mirror</label>
+    <span class="badge badge-idle" id="badge">LOADING</span>
+  </div>
+
+  <div class="container">
+    <div class="video-area">
+      <canvas id="out"></canvas>
+      <div id="loading" class="loading">Loading pose model…</div>
+    </div>
+    <aside class="sidebar">
+      <h3>Detection</h3>
+      <div id="detection" class="nodetect">No pose detected</div>
+      <div id="accuracy" class="acc"></div>
+      <h3>System</h3>
+      <div class="row"><span class="label">Pose:</span><span id="pose-status" class="val">no</span></div>
+      <div class="row"><span class="label">FPS:</span><span id="fps" class="val">0.0</span></div>
+      <div class="row"><span class="label">Poses in model:</span><span id="nmodel" class="val">0</span></div>
+      <h3>Joint Angles</h3>
+      <div id="angles"></div>
+      <h3>Features</h3>
+      <div id="extras"></div>
+      <h3>Skeleton</h3>
+      <canvas id="skelCanvas" width="226" height="260"></canvas>
+    </aside>
+  </div>
+</section>
+
+<!-- Train name dialog -->
+<div class="ov" id="trainOv"><div class="pb">
+  <h3>Name this pose</h3>
+  <input id="trainName" placeholder="e.g. warrior_pose" autocomplete="off">
+  <p class="fine">After a 5 second countdown, hold the pose while 10 snapshots are taken.</p>
+  <div class="btns">
+    <button class="b bt" id="trainGo">Capture</button>
+    <button class="b bk" data-close="trainOv">Cancel</button>
+  </div>
+</div></div>
+
+<!-- Coaching dialog -->
+<div class="ov" id="coachOv"><div class="pb wide">
+  <h3>Coaching Mode</h3>
+  <p class="fine">Select a pose. Your live position is compared against the recorded
+    reference and you get real-time joint corrections.</p>
+  <div id="coachList" class="list"></div>
+  <div id="coachDesc" class="desc"></div>
+  <div class="btns">
+    <button class="b br" id="coachStop">Stop Coaching</button>
+    <button class="b bk" data-close="coachOv">Close</button>
+  </div>
+</div></div>
+
+<!-- Pose library dialog -->
+<div class="ov" id="libOv"><div class="pb wide">
+  <h3>Pose Library</h3>
+  <p class="fine">Ticked poses are used for live detection. Rename a pose to an existing name to merge them.</p>
+  <div id="libList" class="list"></div>
+  <div class="btns wrap">
+    <button class="b bd" id="exportBtn">Export</button>
+    <label class="b bd filebtn">Import<input type="file" id="importFile" accept=".json,application/json"></label>
+    <button class="b bs" id="resetBtn">Reset to defaults</button>
+    <button class="b bk" data-close="libOv">Close</button>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core@4.22.0/dist/tf-core.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter@4.22.0/dist/tf-converter.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl@4.22.0/dist/tf-backend-webgl.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.3/dist/pose-detection.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
