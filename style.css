@@ -17,7 +17,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--
 .menu-card ul{margin:0 0 22px 18px;color:#cbd5e1;line-height:1.8;font-size:.92em}
 .big{width:100%;padding:14px;font-size:1em}
 .fine{color:var(--dim);font-size:.78em;line-height:1.5;margin-top:12px}
-.err{color:#f87171;font-size:.85em;margin-top:12px}
+.err{color:#f87171;font-size:.85em;margin-top:12px;line-height:1.5}
+.campick{display:flex;flex-direction:column;gap:8px}
+.campick label{font-size:.85em;color:var(--muted)}
+.campick .sel{max-width:none;width:100%;padding:10px;font-size:.9em}
 
 /* ---------- buttons ---------- */
 .b{padding:8px 14px;border:none;border-radius:6px;font-weight:700;font-size:.8em;

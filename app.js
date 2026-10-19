@@ -477,15 +477,20 @@ let detector = null;
 let stream = null;
 let running = false;
 
+const CAMERA_KEY = 'poseTrainer.camera';
+
 async function startCamera(deviceId) {
-  if (stream) stream.getTracks().forEach(t => t.stop());
-  const constraints = {
-    audio: false,
-    video: deviceId
-      ? { deviceId: { exact: deviceId }, width: { ideal: CAPTURE_W }, height: { ideal: CAPTURE_H } }
-      : { facingMode: 'user', width: { ideal: CAPTURE_W }, height: { ideal: CAPTURE_H } },
-  };
-  stream = await navigator.mediaDevices.getUserMedia(constraints);
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  const base = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: 'user' };
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: false, video: { ...base, width: { ideal: CAPTURE_W }, height: { ideal: CAPTURE_H } } });
+  } catch (e) {
+    // Some webcams refuse the requested resolution; retry with the camera's own default.
+    if (e.name !== 'NotReadableError' && e.name !== 'OverconstrainedError' && e.name !== 'AbortError') throw e;
+    stream = await navigator.mediaDevices.getUserMedia({ audio: false, video: base });
+  }
+  try { if (deviceId) localStorage.setItem(CAMERA_KEY, deviceId); } catch (e) { /* storage blocked */ }
   video.srcObject = stream;
   await video.play();
   const w = video.videoWidth || CAPTURE_W, h = video.videoHeight || CAPTURE_H;
@@ -979,7 +984,7 @@ $('resetBtn').onclick = async () => {
 };
 
 $('camSel').onchange = async e => {
-  try { await startCamera(e.target.value); } catch (err) { toast('Could not switch camera.', 3000); }
+  try { await startCamera(e.target.value); } catch (err) { toast(cameraErrorText(err), 7000); }
 };
 
 // ===================================================================
@@ -1047,6 +1052,28 @@ function updateSidebar() {
 //  STARTUP
 // ===================================================================
 
+function cameraErrorText(e) {
+  switch (e && e.name) {
+    case 'NotAllowedError':
+      return 'Camera permission was denied. Click the camera icon in the address bar, allow access, then try again. ' +
+             'On Windows also check Settings → Privacy & security → Camera → "Let desktop apps access your camera".';
+    case 'NotReadableError':
+    case 'AbortError':
+      return 'That camera could not be opened. It is probably in use by another app (Teams, Zoom, Discord, the Camera app ' +
+             'or another browser tab). Close those and try again, or pick a different camera above.';
+    case 'NotFoundError':
+    case 'OverconstrainedError':
+      return 'That camera was not found. Check it is plugged in, or pick a different camera.';
+    default:
+      return `Could not open the camera (${(e && (e.name || e.message)) || 'unknown error'}).`;
+  }
+}
+
+async function videoInputs() {
+  return (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'videoinput');
+}
+
+// Step 1: "Start camera" asks for permission (so camera names are visible) and lists the cameras.
 $('startBtn').onclick = async () => {
   const btn = $('startBtn'), err = $('menuErr');
   err.textContent = '';
@@ -1054,14 +1081,52 @@ $('startBtn').onclick = async () => {
     err.textContent = 'This browser cannot access a camera. The page must be opened over https:// (or localhost).';
     return;
   }
-  btn.disabled = true; btn.textContent = 'Starting camera…';
+  btn.disabled = true; btn.textContent = 'Finding cameras…';
+  let probeErr = null;
   try {
-    await startCamera();
+    let devs = await videoInputs();
+    if (!devs.some(d => d.label)) {
+      // Camera names stay hidden until permission is granted, so ask once and release immediately.
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        s.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        probeErr = e;
+        if (e.name === 'NotAllowedError' || e.name === 'SecurityError') throw e;
+      }
+      devs = await videoInputs();
+    }
+    if (!devs.length) throw Object.assign(new Error('No camera found'), { name: 'NotFoundError' });
+
+    let saved = null;
+    try { saved = localStorage.getItem(CAMERA_KEY); } catch (e) { /* storage blocked */ }
+    const sel = $('menuCamSel');
+    sel.innerHTML = '';
+    devs.forEach((d, i) => {
+      const o = document.createElement('option');
+      o.value = d.deviceId; o.textContent = d.label || `Camera ${i + 1}`;
+      if (d.deviceId === saved) o.selected = true;
+      sel.appendChild(o);
+    });
+    btn.classList.add('hidden');
+    $('camPick').classList.remove('hidden');
+    if (probeErr) err.textContent = 'Your default camera could not be opened. Pick a camera from the list.';
   } catch (e) {
     btn.disabled = false; btn.textContent = 'Start camera';
-    err.textContent = e.name === 'NotAllowedError'
-      ? 'Camera permission was denied. Allow camera access in your browser and try again.'
-      : `Could not open a camera (${e.name || e.message}).`;
+    err.textContent = cameraErrorText(e);
+  }
+};
+
+// Step 2: open the chosen camera and start the app.
+$('useCamBtn').onclick = async () => {
+  const btn = $('useCamBtn'), err = $('menuErr');
+  err.textContent = '';
+  btn.disabled = true; btn.textContent = 'Starting camera…';
+  try {
+    await startCamera($('menuCamSel').value || undefined);
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Use this camera';
+    err.textContent = cameraErrorText(e);
     return;
   }
   $('menu').classList.add('hidden');
